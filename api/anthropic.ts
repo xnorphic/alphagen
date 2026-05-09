@@ -18,6 +18,7 @@ export default async function handler(req: any, res: any) {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': ANT_KEY,
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify(req.body),
     });

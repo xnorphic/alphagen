@@ -1,5 +1,15 @@
-import TelegramBot from 'node-telegram-bot-api';
 import { createClient } from '@supabase/supabase-js';
+
+async function sendMessage(token, chatId, text, opts = {}) {
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, ...opts }),
+  });
+  const d = await r.json();
+  if (!d.ok) throw new Error(`Telegram: ${d.description}`);
+  return d.result;
+}
 
 export const config = { runtime: 'nodejs' };
 
@@ -34,7 +44,7 @@ export default async function handler(req, res) {
   if (!BOT_TOKEN) return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN not configured' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const bot      = new TelegramBot(BOT_TOKEN);
+  const tg       = (chatId, text, opts) => sendMessage(BOT_TOKEN, chatId, text, opts);
   const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
@@ -67,7 +77,7 @@ export default async function handler(req, res) {
     }
 
     if (!text.startsWith('/')) {
-      await bot.sendMessage(chatId, '👋 Use /help to see available commands.');
+      await tg(chatId, '👋 Use /help to see available commands.');
       return res.status(200).json({ ok: true });
     }
 
@@ -77,7 +87,7 @@ export default async function handler(req, res) {
     try {
       switch (command) {
         case '/start': {
-          await bot.sendMessage(chatId,
+          await tg(chatId,
             `📊 *Welcome to Alpha\\-Gen Trading Bot\\!*\n\n` +
             `I mirror your Alpha\\-Gen dashboard:\n` +
             `✅ Track your portfolio \\(stocks \\+ indices\\)\n` +
@@ -105,7 +115,7 @@ export default async function handler(req, res) {
                 buy_date:  today,
               }));
               await supabase.from('holdings').upsert(rows, { onConflict: 'user_id,ticker' });
-              await bot.sendMessage(chatId,
+              await tg(chatId,
                 `✅ Portfolio synced from Alpha\\-Gen app \\(${DEFAULT_PORTFOLIO.length} positions\\)\\.\n\nUse /portfolio to view or /analyze to get signals\\.`,
                 { parse_mode: 'MarkdownV2' }
               );
@@ -115,7 +125,7 @@ export default async function handler(req, res) {
         }
 
         case '/help':
-          await bot.sendMessage(chatId,
+          await tg(chatId,
             `📋 *Available Commands:*\n\n` +
             `/portfolio \\- View holdings \\(stocks \\+ indices\\)\n` +
             `/analyze \\- Get buy/sell/hold signals\n` +
@@ -129,8 +139,8 @@ export default async function handler(req, res) {
           break;
 
         case '/portfolio': {
-          if (!supabase)  { await bot.sendMessage(chatId, '⚠️ Database not configured.'); break; }
-          if (!userId)    { await bot.sendMessage(chatId, '⚠️ DB access blocked — run this in Supabase SQL Editor:\n\nALTER TABLE users DISABLE ROW LEVEL SECURITY;\nALTER TABLE holdings DISABLE ROW LEVEL SECURITY;'); break; }
+          if (!supabase)  { await tg(chatId, '⚠️ Database not configured.'); break; }
+          if (!userId)    { await tg(chatId, '⚠️ DB access blocked — run this in Supabase SQL Editor:\n\nALTER TABLE users DISABLE ROW LEVEL SECURITY;\nALTER TABLE holdings DISABLE ROW LEVEL SECURITY;'); break; }
 
           const { data: holdings } = await supabase
             .from('holdings')
@@ -139,7 +149,7 @@ export default async function handler(req, res) {
             .order('ticker');
 
           if (!holdings || holdings.length === 0) {
-            await bot.sendMessage(chatId,
+            await tg(chatId,
               '📭 No portfolio found\\.\n\nSend /start to sync your Alpha\\-Gen portfolio, or add stocks with:\n`/add NVDA 4 137\\.78`',
               { parse_mode: 'MarkdownV2' }
             );
@@ -181,13 +191,13 @@ export default async function handler(req, res) {
           msg += `💰 <b>Total Cost Basis: $${totalInvested.toFixed(0)}</b>\n`;
           msg += `\n💡 Use /analyze to get AI signals`;
 
-          await bot.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+          await tg(chatId, msg, { parse_mode: 'HTML' });
           break;
         }
 
         case '/analyze': {
-          if (!supabase)  { await bot.sendMessage(chatId, '⚠️ Database not configured.'); break; }
-          if (!userId)    { await bot.sendMessage(chatId, '⚠️ DB access blocked — disable RLS in Supabase.'); break; }
+          if (!supabase)  { await tg(chatId, '⚠️ Database not configured.'); break; }
+          if (!userId)    { await tg(chatId, '⚠️ DB access blocked — disable RLS in Supabase.'); break; }
 
           const { data: holdings } = await supabase
             .from('holdings')
@@ -195,21 +205,21 @@ export default async function handler(req, res) {
             .eq('user_id', userId);
 
           if (!holdings || holdings.length === 0) {
-            await bot.sendMessage(chatId, '📭 No holdings found. Send /start to sync your portfolio.');
+            await tg(chatId, '📭 No holdings found. Send /start to sync your portfolio.');
             break;
           }
 
-          await bot.sendMessage(chatId, '⏳ Running Alpha-Gen analysis… (30-60 seconds)');
+          await tg(chatId, '⏳ Running Alpha-Gen analysis… (30-60 seconds)');
 
           const analysis = await generateSignals(holdings, ANT_KEY);
           const msg      = formatSignalsMessage(analysis, holdings);
-          await bot.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+          await tg(chatId, msg, { parse_mode: 'HTML' });
           break;
         }
 
         case '/add': {
           if (args.length < 3) {
-            await bot.sendMessage(chatId, '❌ Format: /add TICKER QTY PRICE\n\nExample: /add NVDA 4 137.78');
+            await tg(chatId, '❌ Format: /add TICKER QTY PRICE\n\nExample: /add NVDA 4 137.78');
             break;
           }
           const ticker   = args[0].toUpperCase();
@@ -218,12 +228,12 @@ export default async function handler(req, res) {
           const buyDate  = args[3] || new Date().toISOString().split('T')[0];
 
           if (isNaN(quantity) || isNaN(buyPrice)) {
-            await bot.sendMessage(chatId, '❌ QTY and PRICE must be numbers.');
+            await tg(chatId, '❌ QTY and PRICE must be numbers.');
             break;
           }
 
           if (!supabase || !userId) {
-            await bot.sendMessage(chatId, `✅ ${ticker} noted (no DB configured)`);
+            await tg(chatId, `✅ ${ticker} noted (no DB configured)`);
             break;
           }
 
@@ -233,10 +243,10 @@ export default async function handler(req, res) {
           );
 
           if (error) {
-            await bot.sendMessage(chatId, `⚠️ Error: ${error.message}`);
+            await tg(chatId, `⚠️ Error: ${error.message}`);
           } else {
             const isIndex = INDICES.has(ticker);
-            await bot.sendMessage(chatId,
+            await tg(chatId,
               `✅ Added <b>${quantity} shares</b> of <b>${ticker}</b> @ $${buyPrice}` +
               (isIndex ? ' <i>(Index/ETF)</i>' : ''),
               { parse_mode: 'HTML' }
@@ -247,13 +257,13 @@ export default async function handler(req, res) {
 
         case '/remove': {
           if (args.length < 1) {
-            await bot.sendMessage(chatId, '❌ Format: /remove TICKER\n\nExample: /remove PATH');
+            await tg(chatId, '❌ Format: /remove TICKER\n\nExample: /remove PATH');
             break;
           }
           const ticker = args[0].toUpperCase();
 
           if (!supabase || !userId) {
-            await bot.sendMessage(chatId, `✅ ${ticker} removed (no DB configured)`);
+            await tg(chatId, `✅ ${ticker} removed (no DB configured)`);
             break;
           }
 
@@ -264,31 +274,31 @@ export default async function handler(req, res) {
             .eq('ticker', ticker);
 
           if (error) {
-            await bot.sendMessage(chatId, `⚠️ Error: ${error.message}`);
+            await tg(chatId, `⚠️ Error: ${error.message}`);
           } else {
-            await bot.sendMessage(chatId, `✅ <b>${ticker}</b> removed from your portfolio`, { parse_mode: 'HTML' });
+            await tg(chatId, `✅ <b>${ticker}</b> removed from your portfolio`, { parse_mode: 'HTML' });
           }
           break;
         }
 
         case '/subscribe': {
           if (supabase) await supabase.from('users').update({ subscribed: true }).eq('telegram_id', telegramId);
-          await bot.sendMessage(chatId, '✅ Subscribed to weekly Alpha-Gen recommendations every Sunday!');
+          await tg(chatId, '✅ Subscribed to weekly Alpha-Gen recommendations every Sunday!');
           break;
         }
 
         case '/unsubscribe': {
           if (supabase) await supabase.from('users').update({ subscribed: false }).eq('telegram_id', telegramId);
-          await bot.sendMessage(chatId, '✅ Unsubscribed from weekly recommendations.');
+          await tg(chatId, '✅ Unsubscribed from weekly recommendations.');
           break;
         }
 
         default:
-          await bot.sendMessage(chatId, `❓ Unknown command: <code>${command}</code>\n\nUse /help.`, { parse_mode: 'HTML' });
+          await tg(chatId, `❓ Unknown command: <code>${command}</code>\n\nUse /help.`, { parse_mode: 'HTML' });
       }
     } catch (err) {
       console.error('Command error:', err);
-      await bot.sendMessage(chatId, `⚠️ Error: ${err.message}`);
+      await tg(chatId, `⚠️ Error: ${err.message}`);
     }
 
     return res.status(200).json({ ok: true });

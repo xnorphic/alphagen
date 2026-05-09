@@ -1,5 +1,15 @@
-import TelegramBot from 'node-telegram-bot-api';
 import { createClient } from '@supabase/supabase-js';
+
+async function sendMessage(token, chatId, text, opts = {}) {
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, ...opts }),
+  });
+  const d = await r.json();
+  if (!d.ok) throw new Error(`Telegram: ${d.description}`);
+  return d.result;
+}
 
 export const config = { runtime: 'nodejs' };
 
@@ -29,7 +39,6 @@ export default async function handler(req, res) {
   if (!BOT_TOKEN)    return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN not configured' });
   if (!SUPABASE_URL) return res.status(500).json({ error: 'Supabase not configured' });
 
-  const bot      = new TelegramBot(BOT_TOKEN);
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   try {
@@ -55,7 +64,7 @@ export default async function handler(req, res) {
         const signals  = await generateSignals(holdings, ANT_KEY);
         const message  = formatWeeklyMessage(signals, holdings);
 
-        await bot.sendMessage(user.chat_id, message, { parse_mode: 'HTML' });
+        await sendMessage(BOT_TOKEN, user.chat_id, message, { parse_mode: 'HTML' });
         successCount++;
 
         const weekOf = getMondayOfWeek(new Date());

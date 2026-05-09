@@ -275,21 +275,21 @@ function WeeklyTab({ portfolio, signals, TV, TI, onGoToUpload }) {
 ───────────────────────────────────────── */
 var CACHE_KEY   = "__alphav8";
 var DAY_MS      = 86400000;
-var TX_COST     = 2;
-var MIN_TRADE   = 25;
+var TX_COST     = parseInt(import.meta.env.VITE_TRANSACTION_COST || "2");
+var MIN_TRADE   = parseInt(import.meta.env.VITE_MIN_TRADE_SIZE || "25");
 var WEEKLY_KEY  = "__weeklySnaps";
 var AUTH_KEY    = "__alphaAuth";
-var AUTH_USER   = "xnorphic";
-var AUTH_PASS   = "!Welcome1234";
+var AUTH_USER   = import.meta.env.VITE_AUTH_USER || "xnorphic";
+var AUTH_PASS   = import.meta.env.VITE_AUTH_PASS || "!Welcome1234";
 var SESSION_MS  = 7 * DAY_MS; /* 7-day session */
-var API_URL     = "https://api.anthropic.com/v1/messages";
-var MODEL_FAST  = "claude-haiku-4-5-20251001";  /* Claude Haiku — vision primary */
-var MODEL_DEEP  = "claude-sonnet-4-20250514";   /* Claude Sonnet — deep quant */
+var API_URL     = import.meta.env.VITE_ANTHROPIC_API_URL || "https://api.anthropic.com/v1/messages";
+var MODEL_FAST  = import.meta.env.VITE_ANTHROPIC_MODEL_FAST || "claude-haiku-4-5-20251001";
+var MODEL_DEEP  = import.meta.env.VITE_ANTHROPIC_MODEL_DEEP || "claude-sonnet-4-20250514";
 var OAI_KEY     = import.meta.env.VITE_OPENAI_API_KEY || "";
 var ANT_KEY     = import.meta.env.VITE_ANTHROPIC_API_KEY || "";
-var OAI_URL     = "https://api.openai.com/v1/chat/completions";
-var OAI_MODEL   = "gpt-4o-mini";                /* OpenAI — fast tasks + vision fallback */
-var SYS_JSON    = "You are a quantitative analyst. Return ONLY valid JSON. No markdown. No text outside the JSON object. Start with { end with }. No trailing commas. No newlines inside string values.";
+var OAI_URL     = import.meta.env.VITE_OPENAI_API_URL || "https://api.openai.com/v1/chat/completions";
+var OAI_MODEL   = import.meta.env.VITE_OPENAI_MODEL || "gpt-4o-mini";
+var SYS_JSON    = import.meta.env.VITE_SYSTEM_PROMPT || "You are a quantitative analyst. Return ONLY valid JSON. No markdown. No text outside the JSON object. Start with { end with }. No trailing commas. No newlines inside string values.";
 
 /* ─────────────────────────────────────────
    DEFAULT PORTFOLIO

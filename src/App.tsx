@@ -1022,7 +1022,7 @@ function AllocChart({ holdings, TV }) {
 /* ─────────────────────────────────────────
    UPLOAD PANEL
 ───────────────────────────────────────── */
-function UploadPanel({ onPortfolioExtracted }) {
+function UploadPanel({ onPortfolioExtracted, uploadHistory }) {
   var [files,      setFiles]      = useState([]);
   var [previews,   setPreviews]   = useState([]);
   var [extracting, setExtracting] = useState(false);
@@ -1166,7 +1166,13 @@ function UploadPanel({ onPortfolioExtracted }) {
       {extracted && extracted.holdings && (
         <Card>
           <div style={{ fontSize: 10, color: C.green, fontWeight: 700, letterSpacing: 1.5, marginBottom: 4 }}>{"✓ " + extracted.holdings.length + " HOLDINGS EXTRACTED"}</div>
-          <div style={{ fontSize: 12, color: C.t2, marginBottom: 12 }}>Review the data below. Click Apply to re-run the full analysis with your updated portfolio.</div>
+          <div style={{ fontSize: 12, color: C.t2, marginBottom: 4 }}>Review the data below. Click Apply to re-run the full analysis with your updated portfolio.</div>
+          {extracted.totalInvested && (
+            <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+              <span style={{ fontSize: 12, color: C.t2 }}>Cost basis: <b style={{ color: C.t1 }}>${Number(extracted.totalInvested).toLocaleString(undefined, { maximumFractionDigits: 0 })}</b></span>
+              {extracted.totalValue && <span style={{ fontSize: 12, color: C.t2 }}>Market value: <b style={{ color: C.t1 }}>${Number(extracted.totalValue).toLocaleString(undefined, { maximumFractionDigits: 0 })}</b></span>}
+            </div>
+          )}
           <div style={{ overflowX: "auto", marginBottom: 14 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
@@ -1209,6 +1215,37 @@ function UploadPanel({ onPortfolioExtracted }) {
               style={{ padding: "10px", borderRadius: 12, border: "none", background: C.greenD, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               ✓ Apply and Re-run Analysis
             </button>
+          </div>
+        </Card>
+      )}
+      {uploadHistory && uploadHistory.length > 0 && (
+        <Card>
+          <div style={{ fontSize: 10, color: C.accent, fontWeight: 700, letterSpacing: 1.5, marginBottom: 12 }}>UPDATE HISTORY</div>
+          <div style={{ display: "grid", gap: 1 }}>
+            {uploadHistory.map(function(entry, i) {
+              var inv = entry.total_invested ? Number(entry.total_invested) : null;
+              var val = entry.total_value    ? Number(entry.total_value)    : null;
+              var pnl = (inv && val) ? ((val - inv) / inv * 100) : null;
+              var pnlPos = pnl !== null && pnl >= 0;
+              var dt = new Date(entry.uploaded_at);
+              var dateStr = dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+              var timeStr = dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+              return (
+                <div key={entry.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", padding: "10px 0", borderBottom: i < uploadHistory.length - 1 ? "0.5px solid " + C.surface : "none" }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.t1 }}>{dateStr} · {timeStr}</div>
+                    <div style={{ fontSize: 11, color: C.t3, marginTop: 2 }}>{entry.num_positions} positions</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    {inv && <div style={{ fontSize: 12, color: C.t2 }}>Cost <b style={{ color: C.t1 }}>${inv.toLocaleString(undefined, { maximumFractionDigits: 0 })}</b></div>}
+                    {val && <div style={{ fontSize: 12, color: C.t2 }}>Value <b style={{ color: C.t1 }}>${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}</b></div>}
+                    {pnl !== null && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: pnlPos ? C.green : C.red }}>{pnlPos ? "+" : ""}{pnl.toFixed(1)}%</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
@@ -1887,17 +1924,18 @@ export default function App() {
 }
 
 function Dashboard({ onLogout }) {
-  var [portfolio,  setPortfolio]  = useState(DEFAULT_P);
-  var [signals,    setSignals]    = useState(null);
-  var [loading,    setLoading]    = useState(true);
-  var [step,       setStep]       = useState(0);
-  var [err,        setErr]        = useState(null);
-  var [tab,        setTab]        = useState("overview");
-  var [selTicker,  setSelTicker]  = useState(null);
-  var [deepL,      setDeepL]      = useState(false);
-  var [deepD,      setDeepD]      = useState({});
-  var [isCustom,   setIsCustom]   = useState(false);
-  var [apiStatus,  setApiStatus]  = useState("checking"); /* checking | online | offline */
+  var [portfolio,     setPortfolio]     = useState(DEFAULT_P);
+  var [signals,       setSignals]       = useState(null);
+  var [loading,       setLoading]       = useState(true);
+  var [step,          setStep]          = useState(0);
+  var [err,           setErr]           = useState(null);
+  var [tab,           setTab]           = useState("overview");
+  var [selTicker,     setSelTicker]     = useState(null);
+  var [deepL,         setDeepL]         = useState(false);
+  var [deepD,         setDeepD]         = useState({});
+  var [isCustom,      setIsCustom]      = useState(false);
+  var [apiStatus,     setApiStatus]     = useState("checking");
+  var [uploadHistory, setUploadHistory] = useState([]);
   var lockRef = useRef(false);
   var timerRef = useRef(null);
 
@@ -1969,6 +2007,24 @@ function Dashboard({ onLogout }) {
       });
   }, []);
 
+  /* Load latest portfolio from DB on mount — keeps all devices in sync */
+  useEffect(function() {
+    fetch("/api/load-portfolio")
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data) return;
+        if (data.history) { setUploadHistory(data.history); }
+        if (data.portfolio && data.portfolio.length > 0) {
+          setPortfolio(data.portfolio);
+          setIsCustom(true);
+          lockRef.current = false;
+          clearCache();
+          runAnalysis(data.portfolio, false);
+        }
+      })
+      .catch(function() {});
+  }, []);
+
   useEffect(function() { runAnalysis(portfolio, false); return function() { if (timerRef.current) { clearTimeout(timerRef.current); } }; }, []);
 
   function handlePortfolioExtracted(newP) {
@@ -1981,6 +2037,13 @@ function Dashboard({ onLogout }) {
     setIsCustom(true);
     setTab("overview");
     runAnalysis(newP, true);
+    /* Refresh upload history after sync settles */
+    setTimeout(function() {
+      fetch("/api/load-portfolio")
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) { if (data && data.history) { setUploadHistory(data.history); } })
+        .catch(function() {});
+    }, 2500);
   }
 
   function retryAnalysis() {
@@ -2111,7 +2174,7 @@ function Dashboard({ onLogout }) {
           {tab === "global" && <GlobalTab />}
 
           {/* ════ UPLOAD ════ */}
-          {tab === "upload" && <UploadPanel onPortfolioExtracted={handlePortfolioExtracted} />}
+          {tab === "upload" && <UploadPanel onPortfolioExtracted={handlePortfolioExtracted} uploadHistory={uploadHistory} />}
 
           {/* ════ OVERVIEW ════ */}
           {tab === "overview" && (

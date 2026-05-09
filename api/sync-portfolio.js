@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     }
   }
 
-  /* ── 2. Upsert weekly snapshot ── */
+  /* ── 2. Upsert weekly snapshot (Telegram cron uses this) ── */
   await supabase.from('portfolio_snapshots').upsert({
     week_of:        weekOf,
     holdings:       holdings,
@@ -63,13 +63,19 @@ export default async function handler(req, res) {
     uploaded_at:    now,
   }, { onConflict: 'week_of' });
 
+  /* ── 3. Append per-upload history row ── */
+  await supabase.from('upload_history').insert({
+    uploaded_at:    now,
+    holdings:       holdings,
+    total_invested: totalInvested || null,
+    total_value:    totalValue    || null,
+    num_positions:  holdings.length,
+  });
+
   return res.status(200).json({
     ok:      true,
     synced:  holdings.length,
     week_of: weekOf,
-    removed: user
-      ? (await supabase.from('holdings').select('ticker').eq('user_id', user.id)).data?.length
-      : 0,
   });
 }
 

@@ -43,6 +43,16 @@ CREATE TABLE IF NOT EXISTS analysis_logs (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Per-upload history — one row per apply, never overwritten
+CREATE TABLE IF NOT EXISTS upload_history (
+  id             SERIAL PRIMARY KEY,
+  uploaded_at    TIMESTAMP DEFAULT NOW(),
+  holdings       JSONB NOT NULL,
+  total_invested DECIMAL(12,2),
+  total_value    DECIMAL(12,2),
+  num_positions  INTEGER
+);
+
 -- Portfolio snapshots — one row per week, keyed by Monday date
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   id             SERIAL PRIMARY KEY,
@@ -59,3 +69,4 @@ CREATE INDEX IF NOT EXISTS idx_recommendations_user_id ON recommendations(user_i
 CREATE INDEX IF NOT EXISTS idx_analysis_logs_user_id  ON analysis_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_users_telegram_id      ON users(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_snapshots_week_of      ON portfolio_snapshots(week_of DESC);
+CREATE INDEX IF NOT EXISTS idx_upload_history_at      ON upload_history(uploaded_at DESC);

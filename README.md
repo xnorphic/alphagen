@@ -36,12 +36,25 @@ npm run build
 
 ## Deployment
 
+### GitHub Pages
+1. GitHub Actions automatically deploys on push to main
+2. Visit: `https://xnorphic.github.io/alphagen/`
+3. **Note:** Users must provide API keys in the browser (no secrets stored)
+
+**To enable:**
+1. Go to Settings → Pages → Source → Deploy from a branch
+2. Select `gh-pages` branch
+3. Done!
+
 ### Vercel (recommended)
-1. Push to GitHub
-2. Go to [vercel.com](https://vercel.com) → Add New Project
-3. Select your GitHub repo
-4. Add environment variables in Settings
-5. Deploy
+1. Go to [vercel.com](https://vercel.com) → Add New Project
+2. Select your GitHub repo
+3. Set environment variables:
+   - `VITE_OPENAI_API_KEY`
+   - `VITE_ANTHROPIC_API_KEY`
+4. Deploy
+
+**Benefits:** Secure environment variables, automatic deployments, better performance
 
 ## Project Structure
 ```

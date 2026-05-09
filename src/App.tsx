@@ -282,12 +282,12 @@ var AUTH_KEY    = "__alphaAuth";
 var AUTH_USER   = import.meta.env.VITE_AUTH_USER || "xnorphic";
 var AUTH_PASS   = import.meta.env.VITE_AUTH_PASS || "!Welcome1234";
 var SESSION_MS  = 7 * DAY_MS; /* 7-day session */
-var API_URL     = import.meta.env.VITE_ANTHROPIC_API_URL || "https://api.anthropic.com/v1/messages";
+var API_URL     = "/api/anthropic";
 var MODEL_FAST  = import.meta.env.VITE_ANTHROPIC_MODEL_FAST || "claude-haiku-4-5-20251001";
 var MODEL_DEEP  = import.meta.env.VITE_ANTHROPIC_MODEL_DEEP || "claude-sonnet-4-20250514";
 var OAI_KEY     = import.meta.env.VITE_OPENAI_API_KEY || "";
 var ANT_KEY     = import.meta.env.VITE_ANTHROPIC_API_KEY || "";
-var OAI_URL     = import.meta.env.VITE_OPENAI_API_URL || "https://api.openai.com/v1/chat/completions";
+var OAI_URL     = "/api/openai";
 var OAI_MODEL   = import.meta.env.VITE_OPENAI_MODEL || "gpt-4o-mini";
 var SYS_JSON    = import.meta.env.VITE_SYSTEM_PROMPT || "You are a quantitative analyst. Return ONLY valid JSON. No markdown. No text outside the JSON object. Start with { end with }. No trailing commas. No newlines inside string values.";
 
@@ -397,7 +397,7 @@ async function callAI(userMsg, model, images) {
       });
       var res = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": ANT_KEY },
+        headers: { "Content-Type": "application/json" },
         body: body,
       });
       if (res.status === 429) { await sleep(delay + rand()); delay *= 2; continue; }
@@ -460,7 +460,7 @@ async function callOpenAI(userMsg, images) {
       });
       var res = await fetch(OAI_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + OAI_KEY },
+        headers: { "Content-Type": "application/json" },
         body: body,
       });
       if (res.status === 429) { await sleep(delay + rand()); delay *= 2; continue; }
@@ -493,7 +493,7 @@ async function checkAPIHealth() {
     });
     var res = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": ANT_KEY },
+      headers: { "Content-Type": "application/json" },
       body: body,
     });
     return res.ok || res.status === 429;

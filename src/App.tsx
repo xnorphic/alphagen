@@ -1097,6 +1097,16 @@ function UploadPanel({ onPortfolioExtracted }) {
     }
     if (!mapped.length) { setErr("Could not parse valid holdings. Try uploading clearer screenshots."); return; }
     onPortfolioExtracted(mapped);
+    /* Fire-and-forget sync to Supabase — keeps Telegram bot in sync */
+    fetch("/api/sync-portfolio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        holdings:       mapped,
+        totalInvested:  extracted.totalInvested  || null,
+        totalValue:     extracted.totalValue     || null,
+      }),
+    }).catch(function(e) { console.warn("Portfolio sync failed:", e.message); });
   }
 
   return (
